@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Function Visualizer | 隐函数 + 参数曲线 + 参数曲面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Inter', 'JetBrains Mono', monospace;
+            background: #0a0a0f;
+            overflow: hidden;
+        }
+
+        .viewer-panel {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            height: calc(100vh - 220px);
+            background: #000;
+            border-radius: 24px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.15);
+            z-index: 10;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+        }
+
+        .viewer-panel.fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 0;
+            z-index: 100;
+        }
+
+        .viewer-panel.fullscreen #canvas3d {
+            width: 100%;
+            height: 100%;
+        }
+
+        .viewer-header {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            z-index: 30;
+            display: flex;
+            gap: 10px;
+        }
+
+        .viewer-btn {
+            background: rgba(20,20,30,0.7);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 30px;
+            font-size: 12px;
+            cursor: pointer;
+            font-family: monospace;
+        }
+
+        .viewer-btn:hover {
+            background: #3b82f6;
+        }
+
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .control-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: rgba(12,12,18,0.85);
+            backdrop-filter: blur(16px);
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.12);
+            padding: 16px 20px;
+            z-index: 20;
+        }
+
+        /* 模式切换 */
+        .mode-switch {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            background: rgba(0,0,0,0.4);
+            padding: 6px;
+            border-radius: 40px;
+            flex-wrap: wrap;
+        }
+
+        .mode-btn {
+            background: transparent;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 32px;
+            color: #aaa;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .mode-btn.active {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .mode-btn:hover:not(.active) {
+            background: rgba(59,130,246,0.3);
+            color: white;
+        }
+
+        /* 输入区域通用 */
+        .input-area {
+            display: block;
+        }
+
+        .input-area.hidden {
+            display: none;
+        }
+
+        .param-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .param-label {
+            width: 30px;
+            font-weight: 600;
+            color: #3b82f6;
+            font-size: 16px;
+        }
+
+        .param-input {
+            flex: 1;
+            min-width: 180px;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid #2a2a35;
+            color: #f0f0f0;
+            padding: 10px 14px;
+            border-radius: 16px;
+            font-family: monospace;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .param-input:focus {
+            border-color: #3b82f6;
+        }
+
+        .param-hint {
+            font-size: 10px;
+            color: #5f6b7a;
+            margin: 4px 0 12px 42px;
+        }
+
+        .equation-input {
+            width: 100%;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid #2a2a35;
+            color: #f0f0f0;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-family: monospace;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .equation-input:focus {
+            border-color: #3b82f6;
+        }
+
+        .generate-btn {
+            background: #3b82f6;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 40px;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .generate-btn:hover {
+            background: #2563eb;
+        }
+
+        .helper-section {
+            margin-top: 12px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            padding-top: 10px;
+        }
+
+        .helper-toggle {
+            background: none;
+            border: none;
+            color: #9ca3af;
+            font-size: 12px;
+            cursor: pointer;
+            font-family: monospace;
+        }
+
+        .helper-toggle:hover {
+            color: white;
+        }
+
+        .helper-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            margin-top: 8px;
+        }
+
+        .helper-content.open {
+            max-height: 200px;
+        }
+
+        .math-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .math-btn {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid #2a2a35;
+            padding: 6px 12px;
+            border-radius: 28px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #ddd;
+            cursor: pointer;
+        }
+
+        .math-btn:hover {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .info-bar {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 10px;
+            color: #5f6b7a;
+        }
+    </style>
+</head>
+<body>
+
+<div class="viewer-panel" id="viewerPanel">
+    <div class="viewer-header">
+        <button class="viewer-btn" id="fullscreenBtn">FULL</button>
+        <button class="viewer-btn" id="resetViewBtn">RESET</button>
+    </div>
+    <canvas id="canvas3d"></canvas>
+</div>
+
+<div class="control-panel">
+    <div class="mode-switch">
+        <button class="mode-btn active" data-mode="implicit">隐函数 F(x,y,z)=0</button>
+        <button class="mode-btn" data-mode="curve">参数曲线 (t)</button>
+        <button class="mode-btn" data-mode="surface">参数曲面 (u,v)</button>
+    </div>
+
+    <!-- 隐函数区域 -->
+    <div id="implicitArea" class="input-area">
+        <input type="text" id="equationInput" class="equation-input" placeholder="例: x^2 + y^2 + z^2 - 4 = 0" value="x^2 + y^2 - z^2 - 1">
+        <button id="generateImplicitBtn" class="generate-btn">生成曲线</button>
+    </div>
+
+    <!--曲线区域-->
+    <div id="curveArea" class="input-area hidden">
+        <div class="param-row">
+            <span class="param-label">x =</span>
+            <input type="text" id="curveX" class="param-input" placeholder="例:cos(t)" value="cos(t)">
+        </div>
+        <div class="param-row">
+            <span class="param-label">y =</span>
+            <input type="text" id="curveY" class="param-input" placeholder="例:sin(t)" value="sin(t)">
+        </div>
+        <div class="param-row">
+            <span class="param-label">z =</span>
+            <input type="text" id="curveZ" class="param-input" placeholder="例:t/2" value="t/2">
+        </div>
+        <div class="param-hint">t ∈ [-4, 4] | 支持: t, sin, cos, exp, sqrt, ^</div>
+        <button id="generateCurveBtn" class="generate-btn">生成曲线</button>
+    </div>
+
+    <!-- 曲面区域 -->
+    <div id="surfaceArea" class="input-area hidden">
+        <div class="param-row">
+            <span class="param-label">x =</span>
+            <input type="text" id="surfaceX" class="param-input" placeholder="例: u * cos(v)" value="u * cos(v)">
+        </div>
+        <div class="param-row">
+            <span class="param-label">y =</span>
+            <input type="text" id="surfaceY" class="param-input" placeholder="例: u * sin(v)" value="u * sin(v)">
+        </div>
+        <div class="param-row">
+            <span class="param-label">z =</span>
+            <input type="text" id="surfaceZ" class="param-input" placeholder="例: u" value="u">
+        </div>
+        <div class="param-hint">u ∈ [-2.5, 2.5], v ∈ [0, 2π] | 支持: u, v, sin, cos, exp, sqrt, ^</div>
+        <button id="generateSurfaceBtn" class="generate-btn">生成曲面</button>
+    </div>
+
+    <div class="helper-section">
+        <button class="helper-toggle" id="helperToggle">MATH SYMBOLS ▼</button>
+        <div class="helper-content" id="helperContent">
+            <div class="math-buttons" id="mathButtons"></div>
+        </div>
+    </div>
+    <div class="info-bar">
+        <span>拖拽旋转 | 右键平移 | 滚轮缩放</span>
+        <span>+ - * / ^ sqrt() sin cos tan log() exp() abs()</span>
+    </div>
+</div>
+
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+        }
+    }
+</script>
+<script type="module" src="script.js"></script>
+</body>
+</html>
