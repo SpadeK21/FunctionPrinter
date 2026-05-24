@@ -358,26 +358,45 @@ document.getElementById('resetViewBtn').addEventListener('click', () => {
     controls.update();
 });
 
+// 数学符号按钮 
 const symbols = ['x^', 'y^', 'z^', 't', 'u', 'v', '+', '-', '*', '/', '^', '=', 'sqrt()', 'sin()', 'cos()', 'tan()', 'log()', 'exp()', 'abs()', 'pi'];
 const container = document.getElementById('mathButtons');
+container.innerHTML = '';
 symbols.forEach(sym => {
     const btn = document.createElement('button');
     btn.className = 'math-btn';
     btn.textContent = sym;
     btn.addEventListener('click', () => {
-        let input;
-        if (currentMode === 'implicit') input = document.getElementById('equationInput');
-        else if (currentMode === 'curve') input = document.activeElement;
-        else input = document.activeElement;
+        // 获取当前活动元素（光标所在的输入框）
+        let input = document.activeElement;
         
-        if (!input || !input.classList || (!input.classList.contains('param-input') && !input.classList.contains('equation-input'))) {
-            if (currentMode === 'implicit') input = document.getElementById('equationInput');
-            else if (currentMode === 'curve') input = document.getElementById('curveX');
-            else input = document.getElementById('surfaceX');
+        // 检查活动元素是否是有效的输入框
+        const isValidInput = input && (
+            input.id === 'equationInput' ||
+            input.id === 'curveX' ||
+            input.id === 'curveY' ||
+            input.id === 'curveZ' ||
+            input.id === 'surfaceX' ||
+            input.id === 'surfaceY' ||
+            input.id === 'surfaceZ'
+        );
+        
+        if (!isValidInput) {
+            // 如果焦点不在有效输入框，根据当前模式选择默认输入框
+            const mode = document.querySelector('.mode-btn.active').getAttribute('data-mode');
+            if (mode === 'implicit') {
+                input = document.getElementById('equationInput');
+            } else if (mode === 'curve') {
+                input = document.getElementById('curveX');
+            } else {
+                input = document.getElementById('surfaceX');
+            }
         }
+        
         const start = input.selectionStart;
         const val = input.value;
-        input.value = val.slice(0, start) + sym + val.slice(start);
+        const newVal = val.slice(0, start) + sym + val.slice(start);
+        input.value = newVal;
         input.focus();
         input.setSelectionRange(start + sym.length, start + sym.length);
     });
